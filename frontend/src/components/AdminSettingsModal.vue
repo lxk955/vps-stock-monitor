@@ -585,7 +585,15 @@ async function verifyPassword() {
 
 async function loadSettings() {
   try {
-    const cfg = await api.getSettings()
+    let resolvedSiteUrl = cfg.site_url || ''
+    if (!resolvedSiteUrl || resolvedSiteUrl.includes('localhost')) {
+      if (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) {
+        resolvedSiteUrl = window.location.origin
+      } else {
+        resolvedSiteUrl = 'https://vps.220360.xyz'
+      }
+    }
+
     smtpForm.value = {
       smtp_host: cfg.smtp_host || '',
       smtp_port: cfg.smtp_port || 465,
@@ -596,7 +604,7 @@ async function loadSettings() {
       smtp_from_email: cfg.smtp_from_email || '',
       smtp_ssl: cfg.smtp_ssl !== false,
       smtp_tls: cfg.smtp_tls === true,
-      site_url: cfg.site_url || 'http://localhost:5173',
+      site_url: resolvedSiteUrl,
     }
     testEmailInput.value = cfg.smtp_user || ''
     cooldownMinutesInput.value = cfg.notification_cooldown_minutes || 30

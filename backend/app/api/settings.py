@@ -40,7 +40,7 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
         "notification_cooldown_minutes": int(config.get("notification_cooldown_minutes", 30) or 30),
         "site_title": config.get("site_title", "VPS 超市 / 实时库存与降价监控"),
         "site_announcement": config.get("site_announcement", "欢迎使用 VPS 实时库存与降价监控平台！关注心仪机型，有货或降价第一时间邮件送达。"),
-        "site_url": config.get("site_url", "http://localhost:5173"),
+        "site_url": config.get("site_url", "https://vps.220360.xyz"),
         # Vendor AFF Referral Codes
         "aff_bwh": config.get("aff_bwh", ""),
         "aff_racknerd": config.get("aff_racknerd", ""),

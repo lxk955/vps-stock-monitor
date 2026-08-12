@@ -84,7 +84,7 @@ async def init_db_data():
         if not pwd_res.scalar_one_or_none():
             default_hash = get_password_hash(settings.DEFAULT_ADMIN_PASSWORD)
             session.add(Setting(key="admin_password_hash", value=default_hash, description="管理员后台密码Hash"))
-            session.add(Setting(key="site_url", value="http://localhost:5173", description="前端网站访问地址"))
+            session.add(Setting(key="site_url", value="https://vps.220360.xyz", description="前端网站访问地址"))
             session.add(Setting(key="crawler_interval_seconds", value=str(settings.DEFAULT_CHECK_INTERVAL_SECONDS), description="库存自动检测间隔(秒)"))
             session.add(Setting(key="crawler_enabled", value="true", description="是否开启自动定时监控"))
             await session.commit()
