@@ -132,6 +132,11 @@ app.include_router(settings_router, prefix=settings.API_V1_STR)
 app.include_router(crawler_router, prefix=settings.API_V1_STR)
 app.include_router(stats_router, prefix=settings.API_V1_STR)
 
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
+async def health_check():
+    return {"status": "ok", "service": settings.PROJECT_NAME}
+
 # Production Static Frontend SPA Support
 dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
 if not os.path.exists(dist_dir):
