@@ -81,7 +81,7 @@ export const api = {
   // Settings
   getSettings: () => request('/settings'),
   updateSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  testSmtp: (test_email) => request('/settings/test-email', { method: 'POST', body: JSON.stringify({ test_email }) }),
+  testSmtp: (data) => request('/settings/test-email', { method: 'POST', body: JSON.stringify(typeof data === 'string' ? { test_email: data } : data) }),
   verifyAdmin: (password) => request('/settings/verify-admin', { method: 'POST', body: JSON.stringify({ password }) }),
   getAlertLogs: (limit = 50) => request(`/settings/alert-logs?limit=${limit}`),
 

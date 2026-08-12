@@ -14,6 +14,14 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 
 class SmtpTestRequest(BaseModel):
     test_email: EmailStr
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_pass: Optional[str] = None
+    smtp_ssl: Optional[bool] = None
+    smtp_tls: Optional[bool] = None
+    smtp_from_name: Optional[str] = None
+    smtp_from_email: Optional[str] = None
 
 class AdminAuthRequest(BaseModel):
     password: str
@@ -86,7 +94,34 @@ async def test_smtp_email(
     admin: dict = Depends(verify_admin_token),
     db: AsyncSession = Depends(get_db)
 ):
-    """Protected: send test email (requires admin token)"""
+    """Protected: in-memory dry run test email without modifying database (requires admin token)"""
+    # Load existing saved settings
+    result = await db.execute(select(Setting))
+    settings_list = result.scalars().all()
+    saved_config = {s.key: s.value for s in settings_list}
+
+    # Resolve active testing config (prefer request data, fallback to saved DB values)
+    active_host = data.smtp_host or saved_config.get("smtp_host", "")
+    active_port = data.smtp_port or int(saved_config.get("smtp_port", 465) or 465)
+    active_user = data.smtp_user or saved_config.get("smtp_user", "")
+    active_pass = data.smtp_pass if data.smtp_pass is not None and data.smtp_pass != "" else saved_config.get("smtp_pass", "")
+    active_from_name = data.smtp_from_name or saved_config.get("smtp_from_name", "VPS 实时库存与降价监控")
+    active_from_email = data.smtp_from_email or active_user or saved_config.get("smtp_from_email", "")
+    active_ssl = data.smtp_ssl if data.smtp_ssl is not None else (saved_config.get("smtp_ssl", "true").lower() in ("true", "1", "yes"))
+    active_tls = data.smtp_tls if data.smtp_tls is not None else (saved_config.get("smtp_tls", "false").lower() in ("true", "1", "yes"))
+
+    custom_cfg = {
+        "host": active_host,
+        "port": active_port,
+        "user": active_user,
+        "pass": active_pass,
+        "from_name": active_from_name,
+        "from_email": active_from_email,
+        "ssl": active_ssl,
+        "tls": active_tls,
+        "site_url": saved_config.get("site_url", "https://vps.220360.xyz")
+    }
+
     test_html = f"""
     <!DOCTYPE html>
     <html>
@@ -108,11 +143,12 @@ async def test_smtp_email(
             to_email=data.test_email,
             subject="🎉【配置测试】VPS 监控面板 SMTP 发信测试成功",
             html_content=test_html,
-            alert_type="test"
+            alert_type="test",
+            custom_smtp_cfg=custom_cfg
         )
-        return {"message": f"测试邮件已成功发送至 {data.test_email}，请查收！"}
+        return {"message": f"测试邮件已成功发送至 {data.test_email}，请查收！", "verified": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"发信失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/verify-admin")
 async def verify_admin_password(data: AdminAuthRequest, db: AsyncSession = Depends(get_db)):

@@ -718,11 +718,12 @@ async function sendTestEmail() {
   testingEmail.value = true
   testResult.value = null
   try {
-    // Auto-save current form settings to database first so SMTP credentials are up to date!
-    await api.updateSettings(smtpForm.value)
-
-    const res = await api.testSmtp(testEmailInput.value)
-    const successMsg = res.message || `测试邮件已成功发送至 ${testEmailInput.value}，请前往查收！`
+    // Pure in-memory probe test: passes form credentials to backend directly without touching DB!
+    const res = await api.testSmtp({
+      test_email: testEmailInput.value,
+      ...smtpForm.value,
+    })
+    const successMsg = res.message || `测试邮件已成功发送至 ${testEmailInput.value}！请前往查收，并点击【保存 SMTP 设置】。`
     testResult.value = {
       success: true,
       message: successMsg,
