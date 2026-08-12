@@ -29,12 +29,18 @@ async def get_smtp_config():
 
 def _send_sync_email(smtp_cfg: dict, to_email: str, subject: str, html_content: str, text_content: str = ""):
     """Synchronous SMTP email sender called inside asyncio.to_thread"""
-    if not smtp_cfg.get("host") or not smtp_cfg.get("user"):
-        raise ValueError("SMTP 服务器尚未配置，请在管理员后台设置 SMTP 信息。")
+    host = (smtp_cfg.get("host") or "").strip()
+    user = (smtp_cfg.get("user") or "").strip()
+    password = (smtp_cfg.get("pass") or "").strip()
+    port = int(smtp_cfg.get("port") or 465)
+
+    if not host or not user:
+        raise ValueError("SMTP 服务器或发件人账号尚未填写完整。")
 
     msg = MIMEMultipart("alternative")
-    from_header = formataddr((smtp_cfg.get("from_name", "VPS 监控"), smtp_cfg.get("from_email", smtp_cfg["user"])))
-    msg["From"] = from_header
+    from_name = smtp_cfg.get("from_name", "VPS 监控")
+    from_email = smtp_cfg.get("from_email") or user
+    msg["From"] = formataddr((from_name, from_email))
     msg["To"] = to_email
     msg["Subject"] = subject
     msg["Date"] = formatdate(localtime=True)
@@ -43,27 +49,34 @@ def _send_sync_email(smtp_cfg: dict, to_email: str, subject: str, html_content: 
         msg.attach(MIMEText(text_content, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-    host = smtp_cfg["host"]
-    port = smtp_cfg["port"]
-    user = smtp_cfg["user"]
-    password = smtp_cfg["pass"]
+    use_ssl = smtp_cfg.get("ssl", True)
+    use_tls = smtp_cfg.get("tls", False)
 
-    if smtp_cfg.get("ssl", True) and port in (465, 994):
-        server = smtplib.SMTP_SSL(host, port, timeout=20)
-    else:
-        server = smtplib.SMTP(host, port, timeout=20)
-        if smtp_cfg.get("tls", False):
-            server.starttls()
+    try:
+        if (use_ssl and port in (465, 994)) or (port == 465):
+            server = smtplib.SMTP_SSL(host, port, timeout=15)
+        else:
+            server = smtplib.SMTP(host, port, timeout=15)
+            if use_tls or port == 587:
+                server.starttls()
 
-    if user and password:
-        server.login(user, password)
-    
-    server.sendmail(smtp_cfg.get("from_email", user), [to_email], msg.as_string())
-    server.quit()
+        if user and password:
+            server.login(user, password)
 
-async def send_email(to_email: str, subject: str, html_content: str, alert_type: str = "general", product_id: int = None, product_name: str = None, subscription_id: int = None):
+        server.sendmail(from_email, [to_email], msg.as_string())
+        server.quit()
+    except smtplib.SMTPAuthenticationError as e:
+        raise ValueError(f"SMTP 身份验证失败 (535)：账号或授权码/密码错误，请检查是否填写了正确的邮箱授权码 (而非邮箱登录密码)。原错误: {e}")
+    except smtplib.SMTPConnectError as e:
+        raise ValueError(f"SMTP 服务器连接失败：无法连接到 {host}:{port}，请检查服务器地址和端口是否正确，或是否需要开启/关闭 SSL。原错误: {e}")
+    except TimeoutError:
+        raise ValueError(f"SMTP 连接超时：连接 {host}:{port} 超时，请检查网络或端口是否被云平台防火墙限制。")
+    except Exception as e:
+        raise ValueError(f"发信失败: {str(e)}")
+
+async def send_email(to_email: str, subject: str, html_content: str, alert_type: str = "general", product_id: int = None, product_name: str = None, subscription_id: int = None, custom_smtp_cfg: dict = None):
     """Async wrapper to send email and write audit log"""
-    smtp_cfg = await get_smtp_config()
+    smtp_cfg = custom_smtp_cfg or await get_smtp_config()
     status = "sent"
     error_msg = None
 
@@ -88,6 +101,9 @@ async def send_email(to_email: str, subject: str, html_content: str, alert_type:
                     created_at=datetime.now(timezone.utc)
                 )
                 session.add(log)
+                await session.commit()
+            except Exception as log_err:
+                print(f"[Log Error] Failed to write alert log: {log_err}")
                 await session.commit()
             except Exception:
                 pass

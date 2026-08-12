@@ -235,10 +235,24 @@
                     type="button"
                     @click="sendTestEmail"
                     :disabled="testingEmail || !testEmailInput"
-                    class="py-1.5 px-3 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
+                    class="py-1.5 px-3 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-1 shrink-0"
                   >
-                    {{ testingEmail ? '发送中...' : '发送测试' }}
+                    <Loader2 v-if="testingEmail" class="w-3.5 h-3.5 animate-spin" />
+                    <span>{{ testingEmail ? '发送中...' : '发送测试' }}</span>
                   </button>
+                </div>
+              </div>
+
+              <!-- Inline Test Email Feedback Banner -->
+              <div
+                v-if="testResult"
+                class="p-3 rounded-xl border text-xs flex items-start gap-2 animate-in fade-in transition-all"
+                :class="testResult.success ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
+              >
+                <span class="text-base shrink-0">{{ testResult.success ? '🎉' : '❌' }}</span>
+                <div class="space-y-0.5">
+                  <div class="font-bold">{{ testResult.success ? '测试发信成功' : '发信失败原因' }}</div>
+                  <div class="text-[11px] leading-relaxed break-all opacity-90">{{ testResult.message }}</div>
                 </div>
               </div>
             </form>
@@ -694,14 +708,33 @@ async function saveCooldownSetting() {
   }
 }
 
+const testResult = ref(null)
+
 async function sendTestEmail() {
-  if (!testEmailInput.value) return
+  if (!testEmailInput.value) {
+    testResult.value = { success: false, message: '请在输入框填写测试收件邮箱地址' }
+    return
+  }
   testingEmail.value = true
+  testResult.value = null
   try {
+    // Auto-save current form settings to database first so SMTP credentials are up to date!
+    await api.updateSettings(smtpForm.value)
+
     const res = await api.testSmtp(testEmailInput.value)
-    emit('success', res.message || '测试邮件已发送！')
+    const successMsg = res.message || `测试邮件已成功发送至 ${testEmailInput.value}，请前往查收！`
+    testResult.value = {
+      success: true,
+      message: successMsg,
+    }
+    emit('success', successMsg)
   } catch (err) {
-    emit('error', err.message || '发送失败，请核对 SMTP 账号与授权码')
+    const errorMsg = err.message || '发信失败，请核对 SMTP 账号、端口与授权码'
+    testResult.value = {
+      success: false,
+      message: errorMsg,
+    }
+    emit('error', errorMsg)
   } finally {
     testingEmail.value = false
   }

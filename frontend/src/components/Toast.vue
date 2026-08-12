@@ -9,7 +9,7 @@
   >
     <div
       v-if="visible"
-      class="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium"
+      class="fixed bottom-5 right-5 z-[99999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium animate-in fade-in slide-in-from-bottom-5 duration-200"
       :class="toastClasses"
     >
       <component :is="iconComponent" class="w-5 h-5 shrink-0" />
