@@ -345,3 +345,82 @@ async def delete_product(
     await db.delete(product)
     await db.commit()
     return {"status": "deleted"}
+
+@router.post("/sync-presets")
+async def sync_preset_products(
+    admin: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db)
+):
+    """Protected: Synchronize / upsert preset products from code into database"""
+    from app.services.presets import PRESET_PRODUCTS
+    updated_count = 0
+    created_count = 0
+
+    for item in PRESET_PRODUCTS:
+        result = await db.execute(
+            select(Product).where(
+                Product.provider == item["provider"],
+                Product.name == item["name"]
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.group = item.get("group", "")
+            existing.cpu = item.get("cpu")
+            existing.ram = item.get("ram")
+            existing.disk = item.get("disk")
+            existing.transfer = item.get("transfer")
+            existing.port_speed = item.get("port_speed")
+            existing.cpu_cores = item.get("cpu_cores", 1)
+            existing.ram_mb = item.get("ram_mb", 1024)
+            existing.disk_gb = item.get("disk_gb", 20)
+            existing.transfer_gb = item.get("transfer_gb", 1000)
+            existing.port_mbps = item.get("port_mbps", 1000)
+            existing.regions_json = json.dumps(item.get("regions", []), ensure_ascii=False)
+            existing.lines_json = json.dumps(item.get("lines", []), ensure_ascii=False)
+            existing.price = item.get("price", 0.0)
+            existing.original_price = item.get("original_price")
+            existing.currency = item.get("currency", "USD")
+            existing.price_cycle = item.get("price_cycle", "annually")
+            existing.affiliate_url = item.get("affiliate_url", "")
+            existing.stock_check_url = item.get("stock_check_url", "")
+            existing.stock_check_type = item.get("stock_check_type", "whmcs")
+            existing.out_of_stock_keyword = item.get("out_of_stock_keyword", "Out of Stock")
+            existing.recommended = bool(item.get("recommended", False))
+            updated_count += 1
+        else:
+            prod = Product(
+                provider=item["provider"],
+                name=item["name"],
+                group=item.get("group", ""),
+                cpu=item.get("cpu"),
+                ram=item.get("ram"),
+                disk=item.get("disk"),
+                transfer=item.get("transfer"),
+                port_speed=item.get("port_speed"),
+                cpu_cores=item.get("cpu_cores", 1),
+                ram_mb=item.get("ram_mb", 1024),
+                disk_gb=item.get("disk_gb", 20),
+                transfer_gb=item.get("transfer_gb", 1000),
+                port_mbps=item.get("port_mbps", 1000),
+                regions_json=json.dumps(item.get("regions", []), ensure_ascii=False),
+                lines_json=json.dumps(item.get("lines", []), ensure_ascii=False),
+                status=item.get("status", "in_stock"),
+                stock_qty=item.get("stock_qty"),
+                price=item.get("price", 0.0),
+                original_price=item.get("original_price"),
+                currency=item.get("currency", "USD"),
+                price_cycle=item.get("price_cycle", "annually"),
+                affiliate_url=item.get("affiliate_url", ""),
+                stock_check_url=item.get("stock_check_url", ""),
+                stock_check_type=item.get("stock_check_type", "whmcs"),
+                out_of_stock_keyword=item.get("out_of_stock_keyword", "Out of Stock"),
+                recommended=item.get("recommended", False),
+                clicks=item.get("clicks", 0),
+                is_active=True
+            )
+            db.add(prod)
+            created_count += 1
+
+    await db.commit()
+    return {"message": f"成功同步预设数据：更新 {updated_count} 个产品，新增 {created_count} 个产品！"}

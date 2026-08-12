@@ -53,6 +53,7 @@ export const api = {
   createProduct: (data) => request('/products', { method: 'POST', body: JSON.stringify(data) }),
   updateProduct: (id, data) => request(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteProduct: (id) => request(`/products/${id}`, { method: 'DELETE' }),
+  syncPresetProducts: () => request('/products/sync-presets', { method: 'POST' }),
 
   // Subscriptions (Watchlist)
   subscribe: (data) => request('/subscriptions', { method: 'POST', body: JSON.stringify(data) }),

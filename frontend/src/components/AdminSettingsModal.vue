@@ -478,6 +478,30 @@
 
           <!-- TAB 3: Crawler & Anti-Harassment Cooldown Management -->
           <div v-else-if="tab === 'crawler'" class="space-y-4">
+            <!-- Preset Database Sync Box -->
+            <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <h4 class="font-bold text-foreground flex items-center gap-1.5">
+                    <span>📦 官方预设机型库同步（Sync Presets）</span>
+                  </h4>
+                  <p class="text-[11px] text-muted-foreground leading-relaxed">
+                    一键从系统最新内置的各大厂商预设库中更新或补全最新机型配置、线路与官方价格。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  @click="syncPresets"
+                  :disabled="syncingPresets"
+                  class="py-2 px-4 bg-secondary hover:bg-secondary/80 text-foreground border border-border font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <Loader2 v-if="syncingPresets" class="w-3.5 h-3.5 animate-spin" />
+                  <RefreshCw v-else class="w-3.5 h-3.5" />
+                  <span>{{ syncingPresets ? '同步中...' : '🔄 一键同步预设库' }}</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Cooldown Setting Box -->
             <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
               <div class="space-y-1">
@@ -626,6 +650,7 @@ const tab = ref('smtp')
 const saving = ref(false)
 const savingAff = ref(false)
 const testingEmail = ref(false)
+const syncingPresets = ref(false)
 const testEmailInput = ref('')
 const cooldownMinutesInput = ref(30)
 const testResult = ref(null)
@@ -902,6 +927,24 @@ function stopPolling() {
   if (crawlerPollTimer) {
     clearInterval(crawlerPollTimer)
     crawlerPollTimer = null
+  }
+}
+
+async function syncPresets() {
+  syncingPresets.value = true
+  try {
+    const res = await api.syncPresetProducts()
+    emit('success', res.message || '成功从官方预设库同步所有机型数据！')
+    await stockStore.fetchProducts()
+  } catch (err) {
+    if (err.message && (err.message.includes('401') || err.message.includes('凭证'))) {
+      logout()
+      emit('error', '登录凭证已过期，请重新输入管理员密码')
+    } else {
+      emit('error', err.message || '同步预设失败')
+    }
+  } finally {
+    syncingPresets.value = false
   }
 }
 
