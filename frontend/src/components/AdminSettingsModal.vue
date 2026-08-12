@@ -13,7 +13,7 @@
           </div>
           <div>
             <h3 class="font-bold text-sm text-foreground">管理后台与系统设置</h3>
-            <p class="text-[11px] text-muted-foreground">配置 SMTP 邮件、各大厂商 AFF 推广返利、监控冷却与爬虫</p>
+            <p class="text-[11px] text-muted-foreground">配置邮件发信、各大厂商 AFF 推广返利、监控冷却与爬虫</p>
           </div>
         </div>
 
@@ -57,7 +57,7 @@
               class="py-2.5 px-3 border-b-2 transition-all whitespace-nowrap"
               :class="tab === 'smtp' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
             >
-              📧 SMTP 邮件
+              📧 邮件发送配置
             </button>
             <button
               @click="tab = 'aff'"
@@ -92,54 +92,137 @@
         </div>
 
         <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-          <!-- TAB 1: SMTP Settings -->
+          <!-- TAB 1: Email Sender Settings (Resend HTTP API vs Standard SMTP) -->
           <div v-if="tab === 'smtp'" class="space-y-4">
-            <!-- Preset Quick Selectors -->
-            <div class="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-2">
-              <div class="font-semibold text-foreground flex items-center justify-between">
-                <span>⚡ 常用发信邮箱一键预设</span>
-                <span class="text-[10px] text-muted-foreground">自动填充服务器与端口</span>
+            <!-- Mode Switcher -->
+            <div class="flex items-center gap-2 p-1.5 rounded-xl bg-secondary/40 border border-border/60">
+              <button
+                type="button"
+                @click="smtpForm.email_provider_type = 'resend'"
+                class="flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                :class="smtpForm.email_provider_type === 'resend' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              >
+                <span>🚀 Resend API 模式</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="smtpForm.email_provider_type === 'resend' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600'">推荐·永不封锁</span>
+              </button>
+              <button
+                type="button"
+                @click="smtpForm.email_provider_type = 'smtp'"
+                class="flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                :class="smtpForm.email_provider_type === 'smtp' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              >
+                <span>📧 经典 SMTP 协议</span>
+                <span class="text-[10px] opacity-70">QQ/163/Gmail</span>
+              </button>
+            </div>
+
+            <!-- SECTION A: Resend API Mode (Recommended for Render / Cloud Containers) -->
+            <div v-if="smtpForm.email_provider_type === 'resend'" class="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+              <div class="space-y-1">
+                <div class="font-bold text-foreground flex items-center justify-between">
+                  <span>🚀 Resend 现代 HTTP API 极速发信</span>
+                  <a href="https://resend.com" target="_blank" class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-normal">
+                    前往注册获取免费 API Key (每月免费3000封) ↗
+                  </a>
+                </div>
+                <p class="text-[11px] text-muted-foreground leading-relaxed">
+                  💡 <strong>为什么推荐？</strong> 云平台（如 Render、AWS 免费容器）通常会封锁传统的 SMTP 25/465/587 端口。而 Resend 使用标准的 <strong>HTTPS (443端口)</strong> 传输，<strong>100% 畅通不被封锁</strong>，且邮件送达率极高，几乎不进垃圾箱！
+                </p>
               </div>
-              <div class="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  @click="applyPreset('qq')"
-                  class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
-                >
-                  QQ 邮箱 (smtp.qq.com:465)
-                </button>
-                <button
-                  type="button"
-                  @click="applyPreset('163')"
-                  class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
-                >
-                  163 邮箱 (smtp.163.com:465)
-                </button>
-                <button
-                  type="button"
-                  @click="applyPreset('gmail')"
-                  class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
-                >
-                  Gmail (smtp.gmail.com:587)
-                </button>
-                <button
-                  type="button"
-                  @click="applyPreset('aliyun')"
-                  class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
-                >
-                  阿里云企业邮 (smtp.qiye.aliyun.com:465)
-                </button>
+
+              <div class="space-y-3 pt-1">
+                <div class="space-y-1">
+                  <label class="font-semibold text-foreground flex items-center justify-between">
+                    <span>Resend API Key <span class="text-rose-500">*</span></span>
+                    <span v-if="smtpForm.resend_key_configured" class="text-emerald-500 text-[10px] font-normal">(已配置)</span>
+                  </label>
+                  <input
+                    type="password"
+                    v-model="smtpForm.resend_api_key"
+                    placeholder="以 re_ 开头的密钥，如 re_123456789..."
+                    class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1">
+                    <label class="font-semibold text-foreground">发件邮箱 (From Email)</label>
+                    <input
+                      type="text"
+                      v-model="smtpForm.smtp_from_email"
+                      placeholder="onboarding@resend.dev (或已认证域名)"
+                      class="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div class="space-y-1">
+                    <label class="font-semibold text-foreground">发件人名称</label>
+                    <input
+                      type="text"
+                      v-model="smtpForm.smtp_from_name"
+                      placeholder="VPS 实时库存与降价监控"
+                      class="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div class="space-y-1">
+                  <label class="font-semibold text-foreground">前端访问网址 (Site URL)</label>
+                  <input
+                    type="text"
+                    v-model="smtpForm.site_url"
+                    placeholder="https://vps.220360.xyz"
+                    class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
+                  />
+                </div>
               </div>
             </div>
 
-            <!-- SMTP Form -->
-            <form @submit.prevent="saveSmtpSettings" class="space-y-3">
+            <!-- SECTION B: Standard SMTP Mode -->
+            <div v-else class="space-y-3">
+              <!-- Preset Quick Selectors -->
+              <div class="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-2">
+                <div class="font-semibold text-foreground flex items-center justify-between">
+                  <span>⚡ 常用发信邮箱一键预设</span>
+                  <span class="text-[10px] text-muted-foreground">自动填充服务器与端口</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    @click="applyPreset('qq')"
+                    class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
+                  >
+                    QQ 邮箱 (smtp.qq.com:465)
+                  </button>
+                  <button
+                    type="button"
+                    @click="applyPreset('163')"
+                    class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
+                  >
+                    163 邮箱 (smtp.163.com:465)
+                  </button>
+                  <button
+                    type="button"
+                    @click="applyPreset('gmail')"
+                    class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
+                  >
+                    Gmail (smtp.gmail.com:587)
+                  </button>
+                  <button
+                    type="button"
+                    @click="applyPreset('aliyun')"
+                    class="px-2.5 py-1 rounded-md bg-card border border-border hover:border-primary text-[11px] font-medium transition-colors"
+                  >
+                    阿里云企业邮 (smtp.qiye.aliyun.com:465)
+                  </button>
+                </div>
+              </div>
+
+              <!-- SMTP Form Fields -->
               <div class="grid grid-cols-2 gap-3">
                 <div class="space-y-1">
                   <label class="font-semibold text-foreground">SMTP 服务器地址</label>
                   <input
                     type="text"
-                    required
                     v-model="smtpForm.smtp_host"
                     placeholder="如 smtp.qq.com"
                     class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
@@ -149,7 +232,6 @@
                   <label class="font-semibold text-foreground">SMTP 端口</label>
                   <input
                     type="number"
-                    required
                     v-model.number="smtpForm.smtp_port"
                     placeholder="465 或 587"
                     class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
@@ -162,7 +244,6 @@
                   <label class="font-semibold text-foreground">发件邮箱账号 (User)</label>
                   <input
                     type="email"
-                    required
                     v-model="smtpForm.smtp_user"
                     placeholder="your-email@qq.com"
                     class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
@@ -197,7 +278,7 @@
                   <input
                     type="text"
                     v-model="smtpForm.site_url"
-                    placeholder="http://localhost:5173"
+                    placeholder="https://vps.220360.xyz"
                     class="w-full px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -213,49 +294,51 @@
                   <span>启用 STARTTLS (端口 587 推荐)</span>
                 </label>
               </div>
+            </div>
 
-              <div class="flex items-center justify-between pt-3 border-t border-border/60">
-                <button
-                  type="submit"
-                  :disabled="saving"
-                  class="py-2 px-5 bg-primary text-primary-foreground font-bold rounded-lg text-xs hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
-                >
-                  {{ saving ? '保存中...' : '保存 SMTP 设置' }}
-                </button>
-
-                <!-- Test Email Trigger -->
-                <div class="flex items-center gap-1.5">
-                  <input
-                    type="email"
-                    v-model="testEmailInput"
-                    placeholder="测试收件邮箱"
-                    class="w-44 px-2.5 py-1.5 text-xs rounded-lg bg-background border border-border font-mono focus:outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    @click="sendTestEmail"
-                    :disabled="testingEmail || !testEmailInput"
-                    class="py-1.5 px-3 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-1 shrink-0"
-                  >
-                    <Loader2 v-if="testingEmail" class="w-3.5 h-3.5 animate-spin" />
-                    <span>{{ testingEmail ? '发送中...' : '发送测试' }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Inline Test Email Feedback Banner -->
-              <div
-                v-if="testResult"
-                class="p-3 rounded-xl border text-xs flex items-start gap-2 animate-in fade-in transition-all"
-                :class="testResult.success ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
+            <!-- Action Buttons: Save and Test -->
+            <div class="flex items-center justify-between pt-3 border-t border-border/60">
+              <button
+                type="button"
+                @click="saveSmtpSettings"
+                :disabled="saving"
+                class="py-2 px-5 bg-primary text-primary-foreground font-bold rounded-lg text-xs hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
               >
-                <span class="text-base shrink-0">{{ testResult.success ? '🎉' : '❌' }}</span>
-                <div class="space-y-0.5">
-                  <div class="font-bold">{{ testResult.success ? '测试发信成功' : '发信失败原因' }}</div>
-                  <div class="text-[11px] leading-relaxed break-all opacity-90">{{ testResult.message }}</div>
-                </div>
+                {{ saving ? '保存中...' : '💾 保存邮件配置' }}
+              </button>
+
+              <!-- Test Email Trigger -->
+              <div class="flex items-center gap-1.5">
+                <input
+                  type="email"
+                  v-model="testEmailInput"
+                  placeholder="输入接收测试邮件的邮箱"
+                  class="w-48 px-2.5 py-1.5 text-xs rounded-lg bg-background border border-border font-mono focus:outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  @click="sendTestEmail"
+                  :disabled="testingEmail || !testEmailInput"
+                  class="py-1.5 px-3 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-1 shrink-0"
+                >
+                  <Loader2 v-if="testingEmail" class="w-3.5 h-3.5 animate-spin" />
+                  <span>{{ testingEmail ? '发送测试中...' : '发送测试' }}</span>
+                </button>
               </div>
-            </form>
+            </div>
+
+            <!-- Inline Test Email Feedback Banner -->
+            <div
+              v-if="testResult"
+              class="p-3 rounded-xl border text-xs flex items-start gap-2 animate-in fade-in transition-all"
+              :class="testResult.success ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
+            >
+              <span class="text-base shrink-0">{{ testResult.success ? '🎉' : '❌' }}</span>
+              <div class="space-y-0.5">
+                <div class="font-bold">{{ testResult.success ? '测试发信成功' : '发信失败原因' }}</div>
+                <div class="text-[11px] leading-relaxed break-all opacity-90">{{ testResult.message }}</div>
+              </div>
+            </div>
           </div>
 
           <!-- TAB 2: AFF Referral Settings (New Feature) -->
@@ -509,8 +592,12 @@ const savingAff = ref(false)
 const testingEmail = ref(false)
 const testEmailInput = ref('')
 const cooldownMinutesInput = ref(30)
+const testResult = ref(null)
 
 const smtpForm = ref({
+  email_provider_type: 'resend', // 'resend' | 'smtp'
+  resend_api_key: '',
+  resend_key_configured: false,
   smtp_host: '',
   smtp_port: 465,
   smtp_user: '',
@@ -520,7 +607,7 @@ const smtpForm = ref({
   smtp_from_email: '',
   smtp_ssl: true,
   smtp_tls: false,
-  site_url: 'http://localhost:5173',
+  site_url: 'https://vps.220360.xyz',
 })
 
 const affForm = ref({
@@ -599,6 +686,7 @@ async function verifyPassword() {
 
 async function loadSettings() {
   try {
+    const cfg = await api.getSettings()
     let resolvedSiteUrl = cfg.site_url || ''
     if (!resolvedSiteUrl || resolvedSiteUrl.includes('localhost')) {
       if (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) {
@@ -609,6 +697,9 @@ async function loadSettings() {
     }
 
     smtpForm.value = {
+      email_provider_type: cfg.email_provider_type || (cfg.resend_key_configured ? 'resend' : 'smtp'),
+      resend_api_key: '',
+      resend_key_configured: cfg.resend_key_configured,
       smtp_host: cfg.smtp_host || '',
       smtp_port: cfg.smtp_port || 465,
       smtp_user: cfg.smtp_user || '',
@@ -672,7 +763,7 @@ async function saveSmtpSettings() {
   saving.value = true
   try {
     await api.updateSettings(smtpForm.value)
-    emit('success', 'SMTP 设置保存成功！')
+    emit('success', '邮件发送设置已成功保存！')
     await loadSettings()
   } catch (err) {
     if (err.message.includes('401') || err.message.includes('凭证')) {
@@ -708,8 +799,6 @@ async function saveCooldownSetting() {
   }
 }
 
-const testResult = ref(null)
-
 async function sendTestEmail() {
   if (!testEmailInput.value) {
     testResult.value = { success: false, message: '请在输入框填写测试收件邮箱地址' }
@@ -718,19 +807,19 @@ async function sendTestEmail() {
   testingEmail.value = true
   testResult.value = null
   try {
-    // Pure in-memory probe test: passes form credentials to backend directly without touching DB!
+    // Pure in-memory probe test
     const res = await api.testSmtp({
       test_email: testEmailInput.value,
       ...smtpForm.value,
     })
-    const successMsg = res.message || `测试邮件已成功发送至 ${testEmailInput.value}！请前往查收，并点击【保存 SMTP 设置】。`
+    const successMsg = res.message || `测试邮件已成功发送至 ${testEmailInput.value}！请查收，确认无误后点击【保存邮件配置】。`
     testResult.value = {
       success: true,
       message: successMsg,
     }
     emit('success', successMsg)
   } catch (err) {
-    const errorMsg = err.message || '发信失败，请核对 SMTP 账号、端口与授权码'
+    const errorMsg = err.message || '发信失败，请核对配置'
     testResult.value = {
       success: false,
       message: errorMsg,

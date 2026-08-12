@@ -14,6 +14,8 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 
 class SmtpTestRequest(BaseModel):
     test_email: EmailStr
+    email_provider_type: Optional[str] = "smtp" # "smtp" | "resend"
+    resend_api_key: Optional[str] = None
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None
     smtp_user: Optional[str] = None
@@ -33,8 +35,12 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
     config = {s.key: s.value for s in settings_list}
 
     smtp_pass_set = bool(config.get("smtp_pass"))
+    resend_key_set = bool(config.get("resend_api_key"))
     
     return {
+        "email_provider_type": config.get("email_provider_type", "smtp"),
+        "resend_api_key": config.get("resend_api_key", ""),
+        "resend_key_configured": resend_key_set,
         "smtp_host": config.get("smtp_host", ""),
         "smtp_port": int(config.get("smtp_port", 465) or 465),
         "smtp_user": config.get("smtp_user", ""),
@@ -110,7 +116,12 @@ async def test_smtp_email(
     active_ssl = data.smtp_ssl if data.smtp_ssl is not None else (saved_config.get("smtp_ssl", "true").lower() in ("true", "1", "yes"))
     active_tls = data.smtp_tls if data.smtp_tls is not None else (saved_config.get("smtp_tls", "false").lower() in ("true", "1", "yes"))
 
+    active_resend_key = data.resend_api_key if data.resend_api_key is not None and data.resend_api_key != "" else saved_config.get("resend_api_key", "")
+    active_provider_type = data.email_provider_type or ("resend" if active_resend_key.startswith("re_") else saved_config.get("email_provider_type", "smtp"))
+
     custom_cfg = {
+        "provider_type": active_provider_type,
+        "resend_api_key": active_resend_key,
         "host": active_host,
         "port": active_port,
         "user": active_user,
