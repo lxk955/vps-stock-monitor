@@ -51,6 +51,7 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
         "smtp_tls": config.get("smtp_tls", "false").lower() in ("true", "1", "yes"),
         "crawler_interval_seconds": int(config.get("crawler_interval_seconds", 180) or 180),
         "crawler_enabled": config.get("crawler_enabled", "true").lower() in ("true", "1", "yes"),
+        "crawler_proxy": config.get("crawler_proxy", ""),
         "notification_cooldown_minutes": int(config.get("notification_cooldown_minutes", 30) or 30),
         "site_title": config.get("site_title", "VPS 超市 / 实时库存与降价监控"),
         "site_announcement": config.get("site_announcement", "欢迎使用 VPS 实时库存与降价监控平台！关注心仪机型，有货或降价第一时间邮件送达。"),

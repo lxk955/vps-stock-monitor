@@ -94,7 +94,8 @@ async def run_stock_check_cycle():
                 return {"total": 0, "restocked": 0, "price_drops": 0, "errors": 0}
 
             sem = asyncio.Semaphore(10)
-            async with httpx.AsyncClient() as client:
+            proxy_url = settings_dict.get("crawler_proxy", "").strip() or None
+            async with httpx.AsyncClient(proxy=proxy_url, timeout=12.0) as client:
                 tasks = [check_single_product_stock_http(client, p, sem) for p in products]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 

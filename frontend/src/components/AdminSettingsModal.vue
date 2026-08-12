@@ -535,6 +535,34 @@
               </div>
             </div>
 
+            <!-- Crawler Proxy Box (To bypass Cloudflare 403 on DMIT) -->
+            <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+              <div class="space-y-1">
+                <h4 class="font-bold text-foreground flex items-center gap-1.5">
+                  <span>🌐 爬虫网络代理 (穿透 Cloudflare / 解决 DMIT 403 专用)</span>
+                </h4>
+                <p class="text-[11px] text-muted-foreground leading-relaxed">
+                  💡 <strong>为什么需要？</strong> DMIT 等厂商官网开启了 Cloudflare 防火墙，会直接拦截 Render/云平台的机房 IP。在此填入你的 HTTP 或 SOCKS5 代理（例如你的梯子或 VPS 节点），爬虫将通过代理 IP 抓取，<strong>彻底突破 DMIT 的 403 拦截并获取实时库存</strong>！
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  v-model="crawlerProxyInput"
+                  placeholder="如 http://1.2.3.4:7890 或 socks5://user:pass@ip:port (留空为直连)"
+                  class="flex-1 px-3 py-1.5 rounded-lg bg-background border border-border font-mono text-xs focus:outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  @click="saveProxySetting"
+                  class="py-1.5 px-4 bg-secondary hover:bg-secondary/80 text-foreground border border-border font-semibold rounded-lg text-xs transition-colors shrink-0"
+                >
+                  保存代理
+                </button>
+              </div>
+            </div>
+
             <!-- Crawler Status Box -->
             <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-4">
               <div class="flex items-center justify-between">
@@ -653,6 +681,7 @@ const testingEmail = ref(false)
 const syncingPresets = ref(false)
 const testEmailInput = ref('')
 const cooldownMinutesInput = ref(30)
+const crawlerProxyInput = ref('')
 const testResult = ref(null)
 
 const smtpForm = ref({
@@ -774,6 +803,7 @@ async function loadSettings() {
     }
     testEmailInput.value = cfg.smtp_user || ''
     cooldownMinutesInput.value = cfg.notification_cooldown_minutes || 30
+    crawlerProxyInput.value = cfg.crawler_proxy || ''
 
     // Load AFF values
     affForm.value = {
@@ -857,6 +887,15 @@ async function saveCooldownSetting() {
     emit('success', `防骚扰冷却时间已更新为 ${cooldownMinutesInput.value} 分钟！`)
   } catch (err) {
     emit('error', err.message || '保存失败')
+  }
+}
+
+async function saveProxySetting() {
+  try {
+    await api.updateSettings({ crawler_proxy: crawlerProxyInput.value })
+    emit('success', crawlerProxyInput.value ? '爬虫网络代理已成功保存并立即生效！' : '已清除爬虫代理，恢复直连模式。')
+  } catch (err) {
+    emit('error', err.message || '保存代理失败')
   }
 }
 
