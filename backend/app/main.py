@@ -103,6 +103,10 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     print(f"[Scheduler] Stock check scheduler started (Interval: {settings.DEFAULT_CHECK_INTERVAL_SECONDS}s)")
     
+    # Run initial stock check in background on boot
+    import asyncio
+    asyncio.create_task(run_stock_check_cycle())
+    
     yield
     
     scheduler.shutdown()

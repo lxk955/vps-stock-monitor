@@ -512,26 +512,62 @@
             </div>
 
             <!-- Crawler Status Box -->
-            <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+            <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-4">
               <div class="flex items-center justify-between">
                 <div>
-                  <h4 class="font-bold text-foreground">实时库存与价格检测引擎</h4>
-                  <p class="text-[11px] text-muted-foreground">当前检测周期：每 180 秒执行一次全网产品并发差分扫描</p>
+                  <h4 class="font-bold text-foreground flex items-center gap-2">
+                    <span>实时库存与价格检测引擎</span>
+                    <span
+                      class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                      :class="crawlerStatus.is_checking ? 'bg-emerald-500/20 text-emerald-500 animate-pulse' : 'bg-secondary text-muted-foreground'"
+                    >
+                      {{ crawlerStatus.is_checking ? '🟢 正在并发扫描检测中...' : '⚪ 待机就绪' }}
+                    </span>
+                  </h4>
+                  <p class="text-[11px] text-muted-foreground mt-0.5">后台定时检测周期：每 180 秒自动执行一次全网高并发差分扫描</p>
                 </div>
                 <button
+                  type="button"
                   @click="triggerManualCheck"
                   :disabled="crawlerStatus.is_checking"
-                  class="py-2 px-4 bg-primary text-primary-foreground font-bold rounded-lg hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-1.5"
+                  class="py-2 px-4 bg-primary text-primary-foreground font-bold rounded-lg hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-1.5 shrink-0 shadow-xs"
                 >
                   <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': crawlerStatus.is_checking }" />
-                  <span>{{ crawlerStatus.is_checking ? '扫描检测中...' : '立即全量检测' }}</span>
+                  <span>{{ crawlerStatus.is_checking ? '全量扫描中...' : '⚡ 立即全量检测' }}</span>
                 </button>
               </div>
 
-              <div class="p-3 rounded-lg bg-background border border-border/70 text-xs font-mono space-y-1">
-                <div><strong>引擎运行状态：</strong> {{ crawlerStatus.is_checking ? '🟢 正在并发扫描中...' : '⚪ 待机中' }}</div>
-                <div><strong>上次扫描时间：</strong> {{ crawlerStatus.last_check_time || '—' }}</div>
-                <div><strong>上次检测结果：</strong> {{ JSON.stringify(crawlerStatus.last_result || {}) }}</div>
+              <!-- Metrics Display -->
+              <div class="grid grid-cols-4 gap-2 pt-1">
+                <div class="p-3 rounded-lg bg-background border border-border text-center">
+                  <div class="text-[10px] text-muted-foreground">已扫描机型</div>
+                  <div class="text-base font-extrabold font-mono text-foreground mt-0.5">
+                    {{ crawlerStatus.last_result?.total ?? (stockStore.products?.length || '—') }}
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg bg-background border border-border text-center">
+                  <div class="text-[10px] text-emerald-600 dark:text-emerald-400">已补货上架</div>
+                  <div class="text-base font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {{ crawlerStatus.last_result?.restocked ?? 0 }}
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg bg-background border border-border text-center">
+                  <div class="text-[10px] text-rose-600 dark:text-rose-400">价格下调</div>
+                  <div class="text-base font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5">
+                    {{ crawlerStatus.last_result?.price_drops ?? 0 }}
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg bg-background border border-border text-center">
+                  <div class="text-[10px] text-amber-600 dark:text-amber-400">异常/跳过</div>
+                  <div class="text-base font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-0.5">
+                    {{ crawlerStatus.last_result?.errors ?? 0 }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-[11px] text-muted-foreground flex items-center justify-between pt-1 border-t border-border/40 font-mono">
+                <span>上次扫描完成时间：<strong>{{ formatCheckTime(crawlerStatus.last_check_time) }}</strong></span>
+                <span v-if="crawlerStatus.is_checking" class="text-primary animate-pulse">正在抓取各厂商最新数据...</span>
               </div>
             </div>
           </div>
@@ -830,6 +866,17 @@ async function sendTestEmail() {
   }
 }
 
+function formatCheckTime(isoStr) {
+  if (!isoStr) return '尚未执行 (等待定时运行或点击上方按钮)'
+  try {
+    const d = new Date(isoStr)
+    if (isNaN(d.getTime())) return isoStr
+    return d.toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return isoStr
+  }
+}
+
 async function loadCrawlerStatus() {
   try {
     const status = await api.getCrawlerStatus()
@@ -845,8 +892,10 @@ function startPolling() {
     await loadCrawlerStatus()
     if (!crawlerStatus.value.is_checking) {
       stopPolling()
+      await stockStore.fetchProducts()
+      await loadAlertLogs()
     }
-  }, 2000)
+  }, 1200)
 }
 
 function stopPolling() {
@@ -858,11 +907,12 @@ function stopPolling() {
 
 async function triggerManualCheck() {
   try {
-    await api.triggerCrawler()
-    emit('success', '已成功触发后台全网并发检测任务！')
-    await loadCrawlerStatus()
+    crawlerStatus.value.is_checking = true
+    const res = await api.triggerCrawler()
+    emit('success', res.message || '已成功触发后台全网并发检测任务！')
     startPolling()
   } catch (err) {
+    crawlerStatus.value.is_checking = false
     emit('error', err.message || '触发失败')
   }
 }
