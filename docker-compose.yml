@@ -1,0 +1,16 @@
+services:
+  vps-stock-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vps-stock-monitor
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend/vps_stock.db:/app/vps_stock.db
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./vps_stock.db
+      - SECRET_KEY=antigravity_vps_monitor_jwt_secret_key_change_me
+      - ADMIN_PASSWORD=admin123456
